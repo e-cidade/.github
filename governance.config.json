@@ -173,6 +173,36 @@
           "dbseller"
         ]
       }
+    },
+    "e-cidade/e-cidade-SertaoDigital": {
+      "policies": [
+        "mirror-default"
+      ],
+      "metadata": {
+        "description": "Mirror da linha e-Cidade mantida pelo Sertão Digital.",
+        "topics": [
+          "e-cidade",
+          "mirror",
+          "software-livre",
+          "software-publico",
+          "sertao-digital"
+        ]
+      }
+    },
+    "e-cidade/e-cidade-CPD": {
+      "policies": [
+        "mirror-default"
+      ],
+      "metadata": {
+        "description": "Mirror da linha e-Cidade mantida pela CPD Municipal.",
+        "topics": [
+          "e-cidade",
+          "mirror",
+          "software-livre",
+          "software-publico",
+          "cpd-municipal"
+        ]
+      }
     }
   }
 }
