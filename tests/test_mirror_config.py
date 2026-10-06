@@ -58,6 +58,26 @@ class MirrorConfigTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "DBSeller/e-cidade")
 
+    def test_list_returns_configured_mirror_ids(self):
+        result = self.run_config(
+            {
+                "mirrors": [
+                    self.valid_mirror(),
+                    self.valid_mirror(
+                        id="other",
+                        source="example/e-cidade",
+                        destination="e-cidade/e-cidade-Other",
+                    ),
+                ]
+            },
+            "list",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(result.stdout),
+            ["dbseller", "other"],
+        )
+
     def test_duplicate_id_is_rejected(self):
         mirror = self.valid_mirror()
         result = self.run_config({"mirrors": [mirror, mirror]}, "validate")
