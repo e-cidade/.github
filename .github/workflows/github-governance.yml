@@ -1,0 +1,81 @@
+name: GitHub governance
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply governance changes
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-governance
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Discover public repositories
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ruleset-sync
+
+    outputs:
+      repositories: ${{ steps.repositories.outputs.repositories }}
+
+    steps:
+      - name: Authenticate GitHub App for organization discovery
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RULESET_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RULESET_APP_PRIVATE_KEY }}
+          owner: e-cidade # zizmor: ignore[github-app] must enumerate organization repositories
+          permission-administration: read
+
+      - name: Discover repositories
+        id: repositories
+        uses: LibreCodeCoop/github-governance/discover@3755c14f01c7d544fe89da3a6daf540faa2510ce # v0.2.0
+        with:
+          organization: e-cidade
+          token: ${{ steps.app-token.outputs.token }}
+
+  reconcile:
+    name: ${{ inputs.apply && 'Apply' || 'Plan' }} e-cidade/${{ matrix.repository }}
+    needs: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ruleset-sync
+
+    strategy:
+      fail-fast: false
+      matrix:
+        repository: ${{ fromJSON(needs.discover.outputs.repositories) }}
+
+    steps:
+      - name: Checkout caller configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Authenticate GitHub App for repository governance
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RULESET_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RULESET_APP_PRIVATE_KEY }}
+          owner: e-cidade
+          repositories: ${{ matrix.repository }}
+          permission-administration: write
+
+      - name: Reconcile repository governance
+        uses: LibreCodeCoop/github-governance@3755c14f01c7d544fe89da3a6daf540faa2510ce # v0.2.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: e-cidade/${{ matrix.repository }}
+          config: ${{ github.workspace }}/governance.config.json
+          apply: ${{ inputs.apply && 'true' || 'false' }}
