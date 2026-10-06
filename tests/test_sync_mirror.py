@@ -114,3 +114,15 @@ class SyncMirrorUnitTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class SyncMirrorSecurityTest(unittest.TestCase):
+    def test_authenticated_url_never_contains_token(self):
+        url = sync_mirror.authenticated_repo_url(
+            "e-cidade/e-cidade-DBSeller",
+            "super-secret-token",
+        )
+        self.assertEqual(
+            url,
+            "https://github.com/e-cidade/e-cidade-DBSeller.git",
+        )
+        self.assertNotIn("super-secret-token", url)
