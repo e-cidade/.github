@@ -101,6 +101,13 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list(args: argparse.Namespace) -> int:
+    data = load_config(Path(args.config))
+    mirror_ids = [mirror["id"] for mirror in data["mirrors"]]
+    print(json.dumps(mirror_ids, separators=(",", ":")))
+    return 0
+
+
 def cmd_get(args: argparse.Namespace) -> int:
     data = load_config(Path(args.config))
     mirror = find_mirror(data, args.mirror)
@@ -130,6 +137,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = sub.add_parser("validate")
     validate.set_defaults(func=cmd_validate)
+
+    list_command = sub.add_parser("list")
+    list_command.set_defaults(func=cmd_list)
 
     get = sub.add_parser("get")
     get.add_argument("mirror")

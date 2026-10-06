@@ -1,6 +1,8 @@
 name: Mirror sync
 
 on:
+  schedule:
+    - cron: '23 8 * * *'
   workflow_dispatch:
     inputs:
       mirror:
@@ -16,10 +18,60 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mirror-sync
+  cancel-in-progress: false
+
 jobs:
+  resolve:
+    name: Resolve mirrors
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      mirrors: ${{ steps.resolve.outputs.mirrors }}
+      dry-run: ${{ steps.resolve.outputs.dry-run }}
+
+    steps:
+      - name: Checkout control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve mirror execution set
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MIRROR: ${{ inputs.mirror }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [[ "$EVENT_NAME" == "schedule" ]]; then
+            mirrors="$(python3 scripts/mirror_config.py list)"
+            dry_run=false
+          else
+            python3 scripts/mirror_config.py get "$INPUT_MIRROR" >/dev/null
+            mirrors="$(jq -cn --arg mirror "$INPUT_MIRROR" '[$mirror]')"
+            dry_run="$INPUT_DRY_RUN"
+          fi
+
+          if [[ "$(jq 'length' <<< "$mirrors")" -eq 0 ]]; then
+            echo "No mirrors configured" >&2
+            exit 1
+          fi
+
+          echo "mirrors=$mirrors" >> "$GITHUB_OUTPUT"
+          echo "dry-run=$dry_run" >> "$GITHUB_OUTPUT"
+
   sync:
+    name: ${{ needs.resolve.outputs.dry-run == 'true' && 'Inspect' || 'Sync' }} ${{ matrix.mirror }}
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mirror: ${{ fromJSON(needs.resolve.outputs.mirrors) }}
 
     steps:
       - name: Checkout control plane
@@ -30,7 +82,7 @@ jobs:
       - name: Resolve mirror configuration
         id: mirror
         env:
-          MIRROR_ID: ${{ inputs.mirror }}
+          MIRROR_ID: ${{ matrix.mirror }}
         run: |
           destination="$(python3 scripts/mirror_config.py get "$MIRROR_ID" --field destination)"
           case "$destination" in
@@ -40,10 +92,11 @@ jobs:
               exit 1
               ;;
           esac
+
           echo "repository=${destination#e-cidade/}" >> "$GITHUB_OUTPUT"
 
       - name: Create mirror app token
-        if: ${{ !inputs.dry_run }}
+        if: ${{ needs.resolve.outputs.dry-run != 'true' }}
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -55,7 +108,7 @@ jobs:
           permission-pull-requests: write
 
       - name: Resolve GitHub App bot identity
-        if: ${{ !inputs.dry_run }}
+        if: ${{ needs.resolve.outputs.dry-run != 'true' }}
         id: app-user
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -65,22 +118,49 @@ jobs:
           echo "user-id=$user_id" >> "$GITHUB_OUTPUT"
 
       - name: Configure Git authentication
-        if: ${{ !inputs.dry_run }}
+        if: ${{ needs.resolve.outputs.dry-run != 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: gh auth setup-git
 
       - name: Inspect upstream
-        if: ${{ inputs.dry_run }}
+        if: ${{ needs.resolve.outputs.dry-run == 'true' }}
         env:
-          MIRROR_ID: ${{ inputs.mirror }}
-        run: python3 scripts/sync_mirror.py plan "$MIRROR_ID"
+          MIRROR_ID: ${{ matrix.mirror }}
+        run: |
+          set -o pipefail
+          python3 scripts/sync_mirror.py plan "$MIRROR_ID" 2>&1 | tee mirror-sync.log
 
       - name: Synchronize mirror
-        if: ${{ !inputs.dry_run }}
+        if: ${{ needs.resolve.outputs.dry-run != 'true' }}
         env:
-          MIRROR_ID: ${{ inputs.mirror }}
+          MIRROR_ID: ${{ matrix.mirror }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           MIRROR_GIT_USER_NAME: ${{ steps.app-token.outputs.app-slug }}[bot]
           MIRROR_GIT_USER_EMAIL: ${{ steps.app-user.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
-        run: python3 scripts/sync_mirror.py sync "$MIRROR_ID"
+        run: |
+          set -o pipefail
+          python3 scripts/sync_mirror.py sync "$MIRROR_ID" 2>&1 | tee mirror-sync.log
+
+      - name: Write mirror summary
+        if: ${{ always() }}
+        env:
+          MIRROR_ID: ${{ matrix.mirror }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN: ${{ needs.resolve.outputs.dry-run }}
+        run: |
+          {
+            echo "## Mirror sync"
+            echo
+            echo "- Mirror: \`$MIRROR_ID\`"
+            echo "- Trigger: \`$EVENT_NAME\`"
+            echo "- Dry run: \`$DRY_RUN\`"
+            echo
+            if [[ -f mirror-sync.log ]]; then
+              echo '```text'
+              cat mirror-sync.log
+              echo '```'
+            else
+              echo "No synchronization output was produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
