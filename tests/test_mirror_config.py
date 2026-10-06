@@ -78,6 +78,29 @@ class MirrorConfigTest(unittest.TestCase):
             ["dbseller", "other"],
         )
 
+    def test_list_skips_disabled_mirrors(self):
+        result = self.run_config(
+            {"mirrors": [
+                self.valid_mirror(enabled=False),
+                self.valid_mirror(
+                    id="other",
+                    source="example/e-cidade",
+                    destination="e-cidade/e-cidade-Other",
+                ),
+            ]},
+            "list",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), ["other"])
+
+    def test_invalid_enabled_is_rejected(self):
+        result = self.run_config(
+            {"mirrors": [self.valid_mirror(enabled="no")]},
+            "validate",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("enabled must be boolean", result.stderr)
+
     def test_duplicate_id_is_rejected(self):
         mirror = self.valid_mirror()
         result = self.run_config({"mirrors": [mirror, mirror]}, "validate")

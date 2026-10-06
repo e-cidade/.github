@@ -81,6 +81,8 @@ def load_config(path: Path) -> dict[str, Any]:
             raise ConfigError(
                 f"mirror {mirror_id}: strip_upstream_workflows must be boolean"
             )
+        if "enabled" in mirror and not isinstance(mirror["enabled"], bool):
+            raise ConfigError(f"mirror {mirror_id}: enabled must be boolean")
 
         seen_ids.add(mirror_id)
         seen_destinations.add(destination)
@@ -103,7 +105,11 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_list(args: argparse.Namespace) -> int:
     data = load_config(Path(args.config))
-    mirror_ids = [mirror["id"] for mirror in data["mirrors"]]
+    mirror_ids = [
+        mirror["id"]
+        for mirror in data["mirrors"]
+        if mirror.get("enabled", True)
+    ]
     print(json.dumps(mirror_ids, separators=(",", ":")))
     return 0
 
