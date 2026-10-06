@@ -307,8 +307,11 @@ def bootstrap(
         )
         return
 
-    publish_upstream_refs(repo, destination, state, token)
     destination_url = authenticated_repo_url(destination, token)
+
+    # On an empty destination, publish the configured default branch first.
+    # This guarantees the repository starts with main rather than an
+    # upstream/* tracking branch becoming the first effective branch.
     run(
         [
             "git",
@@ -318,6 +321,8 @@ def bootstrap(
         ],
         cwd=repo,
     )
+
+    publish_upstream_refs(repo, destination, state, token)
 
 
 def update(
