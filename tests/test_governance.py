@@ -27,13 +27,15 @@ class GovernanceConfigTest(unittest.TestCase):
         repo = self.data["repositories"].get("e-cidade/e-cidade-Contass", {})
         self.assertNotIn("mirror-default", repo.get("policies", []))
 
-    def test_initial_managed_repository_scope_is_explicit(self):
+    def test_managed_repository_scope_is_explicit(self):
         self.assertEqual(
             set(self.data["repositories"]),
             {
                 "e-cidade/.github",
                 "e-cidade/e-cidade",
                 "e-cidade/e-cidade-DBSeller",
+                "e-cidade/e-cidade-SertaoDigital",
+                "e-cidade/e-cidade-CPD",
             },
         )
 
