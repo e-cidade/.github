@@ -1,0 +1,12 @@
+{
+  "mirrors": [
+    {
+      "id": "dbseller",
+      "display_name": "DBSeller",
+      "source": "DBSeller/e-cidade",
+      "destination": "e-cidade/e-cidade-DBSeller",
+      "destination_branch": "main",
+      "strip_upstream_workflows": true
+    }
+  ]
+}
