@@ -13,17 +13,27 @@
       ],
       "conditions": {
         "ref_name": {
-          "include": ["~DEFAULT_BRANCH"],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ],
           "exclude": []
         }
       },
       "rules": [
-        {"type": "deletion"},
-        {"type": "non_fast_forward"},
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "non_fast_forward"
+        },
         {
           "type": "pull_request",
           "parameters": {
-            "allowed_merge_methods": ["merge", "squash", "rebase"],
+            "allowed_merge_methods": [
+              "merge",
+              "squash",
+              "rebase"
+            ],
             "dismiss_stale_reviews_on_push": true,
             "require_code_owner_review": false,
             "require_last_push_approval": false,
@@ -34,7 +44,7 @@
       ]
     },
     "mirror-default": {
-      "name": "Protect mirror default branch",
+      "name": "Protect default branch",
       "target": "branch",
       "enforcement": "active",
       "bypass_actors": [
@@ -46,17 +56,25 @@
       ],
       "conditions": {
         "ref_name": {
-          "include": ["~DEFAULT_BRANCH"],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ],
           "exclude": []
         }
       },
       "rules": [
-        {"type": "deletion"},
-        {"type": "non_fast_forward"},
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "non_fast_forward"
+        },
         {
           "type": "pull_request",
           "parameters": {
-            "allowed_merge_methods": ["merge"],
+            "allowed_merge_methods": [
+              "merge"
+            ],
             "dismiss_stale_reviews_on_push": true,
             "require_code_owner_review": false,
             "require_last_push_approval": false,
@@ -65,34 +83,95 @@
           }
         }
       ]
+    },
+    "organization-config-ci": {
+      "name": "Require organization configuration CI",
+      "target": "branch",
+      "enforcement": "active",
+      "bypass_actors": [
+        {
+          "actor_id": 0,
+          "actor_type": "OrganizationAdmin",
+          "bypass_mode": "pull_request"
+        }
+      ],
+      "conditions": {
+        "ref_name": {
+          "include": [
+            "~DEFAULT_BRANCH"
+          ],
+          "exclude": []
+        }
+      },
+      "rules": [
+        {
+          "type": "required_status_checks",
+          "parameters": {
+            "required_status_checks": [
+              {
+                "context": "Configuration"
+              },
+              {
+                "context": "actionlint"
+              },
+              {
+                "context": "zizmor"
+              }
+            ],
+            "strict_required_status_checks_policy": true,
+            "do_not_enforce_on_create": false
+          }
+        }
+      ]
     }
   },
   "defaults": {
-    "policies": ["protected-default"]
+    "policies": [
+      "protected-default"
+    ]
   },
   "repositories": {
     "e-cidade/.github": {
       "metadata": {
         "description": "Shared GitHub organization configuration, governance and mirror automation for e-Cidade.",
-        "topics": ["e-cidade", "github", "governance", "automation", "mirrors"]
-      }
+        "topics": [
+          "e-cidade",
+          "github",
+          "governance",
+          "automation",
+          "mirrors"
+        ]
+      },
+      "policies": [
+        "organization-config-ci"
+      ]
     },
     "e-cidade/e-cidade": {
       "metadata": {
         "description": "Espaço comunitário do ecossistema e-Cidade: projetos, distribuições, colaboração e governança.",
-        "topics": ["e-cidade", "software-livre", "software-publico", "gestao-publica", "governo-digital", "comunidade"]
+        "topics": [
+          "e-cidade",
+          "software-livre",
+          "software-publico",
+          "gestao-publica",
+          "governo-digital",
+          "comunidade"
+        ]
       }
     },
     "e-cidade/e-cidade-DBSeller": {
-      "policies": ["mirror-default"],
+      "policies": [
+        "mirror-default"
+      ],
       "metadata": {
         "description": "Mirror da distribuição e-Cidade mantida pela DBSeller.",
-        "topics": ["e-cidade", "mirror", "software-livre", "software-publico", "dbseller"]
-      }
-    },
-    "e-cidade/e-cidade-Contass": {
-      "metadata": {
-        "description": "Distribuição do e-Cidade mantida pela Contass."
+        "topics": [
+          "e-cidade",
+          "mirror",
+          "software-livre",
+          "software-publico",
+          "dbseller"
+        ]
       }
     }
   }
