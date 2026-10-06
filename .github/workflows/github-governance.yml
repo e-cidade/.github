@@ -17,36 +17,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  discover:
-    name: Discover public repositories
+  managed-repositories:
+    name: Resolve managed repositories
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: ruleset-sync
 
     outputs:
       repositories: ${{ steps.repositories.outputs.repositories }}
 
     steps:
-      - name: Authenticate GitHub App for organization discovery
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      - name: Checkout caller configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          client-id: ${{ vars.RULESET_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RULESET_APP_PRIVATE_KEY }}
-          owner: e-cidade # zizmor: ignore[github-app] must enumerate organization repositories
-          permission-administration: read
+          persist-credentials: false
 
-      - name: Discover repositories
+      - name: Resolve explicitly managed repositories
         id: repositories
-        uses: LibreCodeCoop/github-governance/discover@3755c14f01c7d544fe89da3a6daf540faa2510ce # v0.2.0
-        with:
-          organization: e-cidade
-          token: ${{ steps.app-token.outputs.token }}
+        run: |
+          repositories="$(
+            jq -c '
+              [
+                .repositories
+                | keys[]
+                | select(startswith("e-cidade/"))
+                | sub("^e-cidade/"; "")
+              ]
+            ' governance.config.json
+          )"
+
+          if [[ "$(jq 'length' <<< "$repositories")" -eq 0 ]]; then
+            echo "No managed repositories configured" >&2
+            exit 1
+          fi
+
+          echo "repositories=$repositories" >> "$GITHUB_OUTPUT"
 
   reconcile:
     name: ${{ inputs.apply && 'Apply' || 'Plan' }} e-cidade/${{ matrix.repository }}
-    needs: discover
+    needs: managed-repositories
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: ruleset-sync
@@ -54,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        repository: ${{ fromJSON(needs.discover.outputs.repositories) }}
+        repository: ${{ fromJSON(needs.managed-repositories.outputs.repositories) }}
 
     steps:
       - name: Checkout caller configuration

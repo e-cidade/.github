@@ -27,6 +27,22 @@ class GovernanceConfigTest(unittest.TestCase):
         repo = self.data["repositories"].get("e-cidade/e-cidade-Contass", {})
         self.assertNotIn("mirror-default", repo.get("policies", []))
 
+    def test_initial_managed_repository_scope_is_explicit(self):
+        self.assertEqual(
+            set(self.data["repositories"]),
+            {
+                "e-cidade/.github",
+                "e-cidade/e-cidade",
+                "e-cidade/e-cidade-DBSeller",
+            },
+        )
+
+    def test_contass_is_outside_managed_scope(self):
+        self.assertNotIn(
+            "e-cidade/e-cidade-Contass",
+            self.data["repositories"],
+        )
+
     def test_control_plane_requires_its_ci(self):
         repo = self.data["repositories"]["e-cidade/.github"]
         self.assertIn("organization-config-ci", repo["policies"])
