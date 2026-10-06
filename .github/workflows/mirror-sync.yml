@@ -1,0 +1,68 @@
+name: Mirror sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      mirror:
+        description: Mirror id from mirrors/mirrors.json
+        required: true
+        default: dbseller
+      dry_run:
+        description: Inspect without pushing changes
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve mirror configuration
+        id: mirror
+        env:
+          MIRROR_ID: ${{ inputs.mirror }}
+        run: |
+          destination="$(python3 scripts/mirror_config.py get "$MIRROR_ID" --field destination)"
+          case "$destination" in
+            e-cidade/*) ;;
+            *)
+              echo "Invalid mirror destination: $destination" >&2
+              exit 1
+              ;;
+          esac
+          echo "repository=${destination#e-cidade/}" >> "$GITHUB_OUTPUT"
+
+      - name: Create mirror app token
+        if: ${{ !inputs.dry_run }}
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.MIRROR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
+          owner: e-cidade
+          repositories: ${{ steps.mirror.outputs.repository }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Inspect upstream
+        if: ${{ inputs.dry_run }}
+        env:
+          MIRROR_ID: ${{ inputs.mirror }}
+        run: python3 scripts/sync_mirror.py plan "$MIRROR_ID"
+
+      - name: Synchronize mirror
+        if: ${{ !inputs.dry_run }}
+        env:
+          MIRROR_ID: ${{ inputs.mirror }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: python3 scripts/sync_mirror.py sync "$MIRROR_ID"
