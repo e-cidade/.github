@@ -422,6 +422,51 @@ def update(
         ["git", "push", "-u", destination_url, f"HEAD:refs/heads/{sync_branch}"],
         cwd=target,
     )
+
+    existing = run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--repo",
+            destination,
+            "--state",
+            "open",
+            "--head",
+            sync_branch,
+            "--json",
+            "url",
+            "--jq",
+            ".[0].url // empty",
+        ],
+        cwd=target,
+    ).stdout.strip()
+
+    if not existing:
+        run(
+            [
+                "gh",
+                "pr",
+                "create",
+                "--repo",
+                destination,
+                "--base",
+                destination_branch,
+                "--head",
+                sync_branch,
+                "--title",
+                f"sync: upstream {state.default_branch} {short_sha}",
+                "--body",
+                (
+                    "Sincronização automática do upstream "
+                    f"`{mirror['source']}` até `{state.heads[state.default_branch]}`.\n\n"
+                    "Este PR preserva o histórico Git do upstream e reaplica "
+                    "somente a camada administrativa do mirror."
+                ),
+            ],
+            cwd=target,
+        )
+
     return sync_branch
 
 

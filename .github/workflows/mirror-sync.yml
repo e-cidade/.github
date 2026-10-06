@@ -27,6 +27,21 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Resolve mirror configuration
+        id: mirror
+        env:
+          MIRROR_ID: ${{ inputs.mirror }}
+        run: |
+          destination="$(python3 scripts/mirror_config.py get "$MIRROR_ID" --field destination)"
+          case "$destination" in
+            e-cidade/*) ;;
+            *)
+              echo "Invalid mirror destination: $destination" >&2
+              exit 1
+              ;;
+          esac
+          echo "repository=${destination#e-cidade/}" >> "$GITHUB_OUTPUT"
+
       - name: Create mirror app token
         if: ${{ !inputs.dry_run }}
         id: app-token
@@ -35,17 +50,19 @@ jobs:
           client-id: ${{ vars.MIRROR_APP_CLIENT_ID }}
           private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
           owner: e-cidade
-          repositories: |
-            e-cidade-DBSeller
+          repositories: ${{ steps.mirror.outputs.repository }}
           permission-contents: write
           permission-pull-requests: write
 
       - name: Inspect upstream
         if: ${{ inputs.dry_run }}
-        run: python3 scripts/sync_mirror.py plan "${{ inputs.mirror }}"
+        env:
+          MIRROR_ID: ${{ inputs.mirror }}
+        run: python3 scripts/sync_mirror.py plan "$MIRROR_ID"
 
       - name: Synchronize mirror
         if: ${{ !inputs.dry_run }}
         env:
+          MIRROR_ID: ${{ inputs.mirror }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: python3 scripts/sync_mirror.py sync "${{ inputs.mirror }}"
+        run: python3 scripts/sync_mirror.py sync "$MIRROR_ID"
