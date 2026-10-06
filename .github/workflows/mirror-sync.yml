@@ -54,6 +54,22 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
+      - name: Resolve GitHub App bot identity
+        if: ${{ !inputs.dry_run }}
+        id: app-user
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          echo "user-id=$user_id" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Git authentication
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh auth setup-git
+
       - name: Inspect upstream
         if: ${{ inputs.dry_run }}
         env:
@@ -65,4 +81,6 @@ jobs:
         env:
           MIRROR_ID: ${{ inputs.mirror }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          MIRROR_GIT_USER_NAME: ${{ steps.app-token.outputs.app-slug }}[bot]
+          MIRROR_GIT_USER_EMAIL: ${{ steps.app-user.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
         run: python3 scripts/sync_mirror.py sync "$MIRROR_ID"

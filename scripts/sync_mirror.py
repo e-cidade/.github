@@ -64,14 +64,19 @@ def run(
     )
     if result.returncode != 0:
         stderr = result.stderr.strip() if result.stderr else ""
-        raise SyncError(f"command failed ({' '.join(args)}): {stderr}")
+        token = os.environ.get("GH_TOKEN")
+        rendered_args = " ".join(args)
+        if token:
+            rendered_args = rendered_args.replace(token, "***")
+            stderr = stderr.replace(token, "***")
+        raise SyncError(f"command failed ({rendered_args}): {stderr}")
     return result
 
 
 def authenticated_repo_url(repository: str, token: str | None) -> str:
-    if not token:
-        return f"https://github.com/{repository}.git"
-    return f"https://x-access-token:{token}@github.com/{repository}.git"
+    # Authentication is provided by the Git credential helper configured
+    # by `gh auth setup-git`. Never embed installation tokens in remote URLs.
+    return f"https://github.com/{repository}.git"
 
 
 def parse_ls_remote(text: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -149,16 +154,13 @@ def strip_upstream_workflows(repo: Path) -> list[str]:
 
 
 def configure_identity(repo: Path) -> None:
-    run(["git", "config", "user.name", "e-Cidade Mirror Bot"], cwd=repo)
-    run(
-        [
-            "git",
-            "config",
-            "user.email",
-            "e-cidade-mirror[bot]@users.noreply.github.com",
-        ],
-        cwd=repo,
+    name = os.environ.get("MIRROR_GIT_USER_NAME", "e-Cidade Mirror Bot")
+    email = os.environ.get(
+        "MIRROR_GIT_USER_EMAIL",
+        "e-cidade-mirror@users.noreply.github.com",
     )
+    run(["git", "config", "user.name", name], cwd=repo)
+    run(["git", "config", "user.email", email], cwd=repo)
 
 
 def has_changes(repo: Path) -> bool:
